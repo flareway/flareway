@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Content Editor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .view-toggle {
+            background-color: #34495e;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .view-toggle:hover {
+            background-color: #4a6741;
+        }
+        
+        .view-toggle.active {
+            background-color: #27ae60;
+        }
+        
+        .sync-btn {
+            background-color: #3498db;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .sync-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .content-area {
+            padding: 20px;
+            min-height: 500px;
+        }
+        
+        .view-mode-indicator {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-left: 4px solid #3498db;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .separate-view {
+            display: none;
+        }
+        
+        .merged-view {
+            display: none;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .pagination button {
+            background-color: #34495e;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .pagination button:hover {
+            background-color: #2c3e50;
+        }
+        
+        .pagination button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        .page-info {
+            background-color: #ecf0f1;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .content-item {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .content-item h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .content-item p {
+            margin: 0;
+            color: #6c757d;
+            line-height: 1.5;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        
+        .error {
+            background-color: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">Smart Content Editor</div>
+            <div class="controls">
+                <button id="separateViewBtn" class="view-toggle active">Separate View</button>
+                <button id="mergedViewBtn" class="view-toggle">Merged View</button>
+                <button id="syncBtn" class="sync-btn">🔄 Sync</button>
+            </div>
+        </div>
+        
+        <div class="content-area">
+            <div class="view-mode-indicator">
+                <span id="viewModeText">Separate View Mode - Paginated Content</span>
+            </div>
+            
+            <div id="separateView" class="separate-view">
+                <div id="separateContent"></div>
+                <div class="pagination">
+                    <button id="prevBtn">← Previous</button>
+                    <div class="page-info">
+                        Page <span id="currentPage">1</span> of <span id="totalPages">1</span>
+                    </div>
+                    <button id="nextBtn">Next →</button>
+                </div>
+            </div>
+            
+            <div id="mergedView" class="merged-view">
+                <div id="mergedContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Smart Content Editor Controller
+        class SmartContentEditor {
+            constructor() {
+                this.currentView = 'separate'; // Default to separate view
+                this.currentPage = 1;
+                this.itemsPerPage = 3;
+                this.totalItems = 0;
+                this.cachedSeparateContent = null;
+                this.cachedMergedContent = null;
+                this.isLoading = false;
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.loadInitialContent();
+            }
+            
+            initializeElements() {
+                this.separateViewBtn = document.getElementById('separateViewBtn');
+                this.mergedViewBtn = document.getElementById('mergedViewBtn');
+                this.syncBtn = document.getElementById('syncBtn');
+                this.separateView = document.getElementById('separateView');
+                this.mergedView = document.getElementById('mergedView');
+                this.separateContent = document.getElementById('separateContent');
+                this.mergedContent = document.getElementById('mergedContent');
+                this.viewModeText = document.getElementById('viewModeText');
+                this.prevBtn = document.getElementById('prevBtn');
+                this.nextBtn = document.getElementById('nextBtn');
+                this.currentPageSpan = document.getElementById('currentPage');
+                this.totalPagesSpan = document.getElementById('totalPages');
+            }
+            
+            bindEvents() {
+                this.separateViewBtn.addEventListener('click', () => this.switchToSeparateView());
+                this.mergedViewBtn.addEventListener('click', () => this.switchToMergedView());
+                this.syncBtn.addEventListener('click', () => this.syncContent());
+                this.prevBtn.addEventListener('click', () => this.goToPreviousPage());
+                this.nextBtn.addEventListener('click', () => this.goToNextPage());
+            }
+            
+            async loadInitialContent() {
+                // Set default view to separate view
+                this.showSeparateView();
+                await this.loadSeparateViewContents();
+            }
+            
+            switchToSeparateView() {
+                if (this.currentView === 'separate') return;
+                
+                this.currentView = 'separate';
+                this.updateViewButtons();
+                this.showSeparateView();
+                
+                // Use cached content if available, don't reload unnecessarily
+                if (this.cachedSeparateContent) {
+                    this.renderSeparateContent();
+                } else {
+                    this.loadSeparateViewContents();
+                }
+            }
+            
+            switchToMergedView() {
+                if (this.currentView === 'merged') return;
+                
+                this.currentView = 'merged';
+                this.updateViewButtons();
+                this.showMergedView();
+                
+                // Use cached content if available, don't reload unnecessarily
+                if (this.cachedMergedContent) {
+                    this.renderMergedContent();
+                } else {
+                    this.loadMergedViewContents();
+                }
+            }
+            
+            updateViewButtons() {
+                if (this.currentView === 'separate') {
+                    this.separateViewBtn.classList.add('active');
+                    this.mergedViewBtn.classList.remove('active');
+                    this.viewModeText.textContent = 'Separate View Mode - Paginated Content';
+                } else {
+                    this.separateViewBtn.classList.remove('active');
+                    this.mergedViewBtn.classList.add('active');
+                    this.viewModeText.textContent = 'Merged View Mode - All Content Combined';
+                }
+            }
+            
+            showSeparateView() {
+                this.separateView.style.display = 'block';
+                this.mergedView.style.display = 'none';
+            }
+            
+            showMergedView() {
+                this.separateView.style.display = 'none';
+                this.mergedView.style.display = 'block';
+            }
+            
+            async loadSeparateViewContents() {
+                if (this.isLoading) return;
+                
+                this.isLoading = true;
+                this.showLoading(this.separateContent);
+                
+                try {
+                    // Simulate API call
+                    const data = await this.fetchContent('separate');
+                    this.cachedSeparateContent = data;
+                    this.totalItems = data.length;
+                    this.renderSeparateContent();
+                } catch (error) {
+                    this.showError(this.separateContent, 'Failed to load separate view content');
+                } finally {
+                    this.isLoading = false;
+                }
+            }
+            
+            async loadMergedViewContents() {
+                if (this.isLoading) return;
+                
+                this.isLoading = true;
+                this.showLoading(this.mergedContent);
+                
+                try {
+                    // Simulate API call
+                    const data = await this.fetchContent('merged');
+                    this.cachedMergedContent = data;
+                    this.renderMergedContent();
+                } catch (error) {
+                    this.showError(this.mergedContent, 'Failed to load merged view content');
+                } finally {
+                    this.isLoading = false;
+                }
+            }
+            
+            async syncContent() {
+                // Clear cached content and reload current view
+                this.cachedSeparateContent = null;
+                this.cachedMergedContent = null;
+                
+                if (this.currentView === 'separate') {
+                    await this.loadSeparateViewContents();
+                } else {
+                    await this.loadMergedViewContents();
+                }
+            }
+            
+            renderSeparateContent() {
+                if (!this.cachedSeparateContent) return;
+                
+                const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+                const endIndex = startIndex + this.itemsPerPage;
+                const pageItems = this.cachedSeparateContent.slice(startIndex, endIndex);
+                
+                this.separateContent.innerHTML = pageItems.map(item => `
+                    <div class="content-item">
+                        <h3>${item.title}</h3>
+                        <p>${item.content}</p>
+                    </div>
+                `).join('');
+                
+                this.updatePagination();
+            }
+            
+            renderMergedContent() {
+                if (!this.cachedMergedContent) return;
+                
+                this.mergedContent.innerHTML = this.cachedMergedContent.map(item => `
+                    <div class="content-item">
+                        <h3>${item.title}</h3>
+                        <p>${item.content}</p>
+                    </div>
+                `).join('');
+            }
+            
+            updatePagination() {
+                const totalPages = Math.ceil(this.totalItems / this.itemsPerPage);
+                this.currentPageSpan.textContent = this.currentPage;
+                this.totalPagesSpan.textContent = totalPages;
+                
+                this.prevBtn.disabled = this.currentPage <= 1;
+                this.nextBtn.disabled = this.currentPage >= totalPages;
+            }
+            
+            goToPreviousPage() {
+                if (this.currentPage > 1) {
+                    this.currentPage--;
+                    this.renderSeparateContent();
+                }
+            }
+            
+            goToNextPage() {
+                const totalPages = Math.ceil(this.totalItems / this.itemsPerPage);
+                if (this.currentPage < totalPages) {
+                    this.currentPage++;
+                    this.renderSeparateContent();
+                }
+            }
+            
+            showLoading(container) {
+                container.innerHTML = '<div class="loading">Loading content...</div>';
+            }
+            
+            showError(container, message) {
+                container.innerHTML = `<div class="error">${message}</div>`;
+            }
+            
+            async fetchContent(viewType) {
+                // Simulate API delay
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                // Mock data
+                const mockData = [
+                    { id: 1, title: 'Content Item 1', content: 'This is the first piece of content in the smart editor. It demonstrates the separate view functionality with proper pagination.' },
+                    { id: 2, title: 'Content Item 2', content: 'Second content item showcasing the caching mechanism that prevents unnecessary reloads when switching between views.' },
+                    { id: 3, title: 'Content Item 3', content: 'Third item demonstrating the state management between different view modes in the smart content editor.' },
+                    { id: 4, title: 'Content Item 4', content: 'Fourth content piece showing how the pagination works correctly with the cached content.' },
+                    { id: 5, title: 'Content Item 5', content: 'Fifth item that helps demonstrate the difference between separate and merged view modes.' },
+                    { id: 6, title: 'Content Item 6', content: 'Sixth content item completing our mock data set for testing the smart content editor functionality.' },
+                    { id: 7, title: 'Content Item 7', content: 'Seventh item providing additional content for testing pagination and view switching.' },
+                    { id: 8, title: 'Content Item 8', content: 'Eighth content piece ensuring we have enough data to test multiple pages in separate view.' }
+                ];
+                
+                return mockData;
+            }
+        }
+        
+        // Initialize the Smart Content Editor when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new SmartContentEditor();
+        });
+    </script>
+</body>
+</html>
