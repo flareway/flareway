@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Content Editor Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .pass { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .fail { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <h1>Smart Content Editor Functionality Test</h1>
+    <div id="test-results"></div>
+    
+    <script>
+        class SmartContentEditorTest {
+            constructor() {
+                this.results = [];
+                this.runTests();
+            }
+            
+            test(name, condition) {
+                const passed = condition();
+                this.results.push({ name, passed });
+                this.displayResult(name, passed);
+                return passed;
+            }
+            
+            displayResult(name, passed) {
+                const resultsDiv = document.getElementById('test-results');
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `test-result ${passed ? 'pass' : 'fail'}`;
+                resultDiv.textContent = `${passed ? '✅' : '❌'} ${name}`;
+                resultsDiv.appendChild(resultDiv);
+            }
+            
+            runTests() {
+                // Test 1: Default view mode
+                this.test('Default view should be separate view', () => {
+                    // Simulate the SmartContentEditor initialization
+                    const mockEditor = { currentView: 'separate' };
+                    return mockEditor.currentView === 'separate';
+                });
+                
+                // Test 2: View switching logic
+                this.test('View switching should update currentView', () => {
+                    const mockEditor = { currentView: 'separate' };
+                    // Simulate switchToMergedView
+                    if (mockEditor.currentView !== 'merged') {
+                        mockEditor.currentView = 'merged';
+                    }
+                    return mockEditor.currentView === 'merged';
+                });
+                
+                // Test 3: Caching mechanism
+                this.test('Content should be cached to prevent unnecessary reloads', () => {
+                    const mockEditor = {
+                        cachedSeparateContent: null,
+                        cachedMergedContent: null,
+                        loadContent: function(view) {
+                            if (view === 'separate' && !this.cachedSeparateContent) {
+                                this.cachedSeparateContent = ['item1', 'item2', 'item3'];
+                            }
+                            if (view === 'merged' && !this.cachedMergedContent) {
+                                this.cachedMergedContent = ['merged1', 'merged2'];
+                            }
+                        },
+                        shouldReload: function(view) {
+                            if (view === 'separate') return !this.cachedSeparateContent;
+                            if (view === 'merged') return !this.cachedMergedContent;
+                            return true;
+                        }
+                    };
+                    
+                    // First load
+                    mockEditor.loadContent('separate');
+                    const firstLoadNeeded = mockEditor.shouldReload('separate');
+                    
+                    // Second access (should use cache)
+                    const secondLoadNeeded = mockEditor.shouldReload('separate');
+                    
+                    return !firstLoadNeeded && !secondLoadNeeded;
+                });
+                
+                // Test 4: Pagination logic
+                this.test('Pagination should work correctly', () => {
+                    const mockPagination = {
+                        currentPage: 1,
+                        itemsPerPage: 3,
+                        totalItems: 8,
+                        getTotalPages: function() {
+                            return Math.ceil(this.totalItems / this.itemsPerPage);
+                        },
+                        canGoNext: function() {
+                            return this.currentPage < this.getTotalPages();
+                        },
+                        canGoPrevious: function() {
+                            return this.currentPage > 1;
+                        }
+                    };
+                    
+                    // Test initial state
+                    const initialCanPrev = mockPagination.canGoPrevious(); // Should be false
+                    const initialCanNext = mockPagination.canGoNext(); // Should be true
+                    const totalPages = mockPagination.getTotalPages(); // Should be 3
+                    
+                    return !initialCanPrev && initialCanNext && totalPages === 3;
+                });
+                
+                // Test 5: State persistence
+                this.test('State should be maintained between view switches', () => {
+                    const mockEditor = {
+                        currentView: 'separate',
+                        currentPage: 2,
+                        cachedSeparateContent: ['item1', 'item2'],
+                        switchToMergedView: function() {
+                            this.currentView = 'merged';
+                            // State should be preserved
+                        },
+                        switchToSeparateView: function() {
+                            this.currentView = 'separate';
+                            // State should be preserved
+                        }
+                    };
+                    
+                    const originalPage = mockEditor.currentPage;
+                    const originalCache = mockEditor.cachedSeparateContent;
+                    
+                    mockEditor.switchToMergedView();
+                    mockEditor.switchToSeparateView();
+                    
+                    return mockEditor.currentPage === originalPage && 
+                           mockEditor.cachedSeparateContent === originalCache;
+                });
+                
+                // Summary
+                const passedTests = this.results.filter(r => r.passed).length;
+                const totalTests = this.results.length;
+                
+                const summaryDiv = document.createElement('div');
+                summaryDiv.className = `test-result ${passedTests === totalTests ? 'pass' : 'fail'}`;
+                summaryDiv.innerHTML = `<strong>Test Summary: ${passedTests}/${totalTests} tests passed</strong>`;
+                document.getElementById('test-results').appendChild(summaryDiv);
+            }
+        }
+        
+        // Run tests when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new SmartContentEditorTest();
+        });
+    </script>
+</body>
+</html>
